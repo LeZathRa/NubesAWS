@@ -1,0 +1,14 @@
+{% extends "layout.html" %}
+
+{% block content %}
+    <h1>Bienvenido</h1>
+    {% if 'admin' in user_roles %}
+        <a href="{{ url_for('mostrar_formulario_subir_documento') }}">Subir Documento</a><br>
+        <a href="{{ url_for('listar_documentos') }}">Ver Documentos</a><br>
+        <a href="{{ url_for('almacenamiento') }}">Almacenamiento</a><br>
+        <a href="{{ url_for('destacados') }}">Documentos Destacados</a><br>
+    {% else %}
+        <a href="{{ url_for('listar_documentos') }}">Ver Documentos</a><br>
+        <a href="{{ url_for('almacenamiento') }}">Almacenamiento</a><br>
+    {% endif %}
+{% endblock %}

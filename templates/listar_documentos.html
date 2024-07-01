@@ -1,0 +1,10 @@
+{% extends "layout.html" %}
+
+{% block content %}
+    <h1>Lista de Documentos</h1>
+    <ul>
+        {% for archivo in archivos %}
+            <li>{{ archivo.Key }}</li>
+        {% endfor %}
+    </ul>
+{% endblock %}
