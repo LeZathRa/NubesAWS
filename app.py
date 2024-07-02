@@ -1,7 +1,8 @@
-from xml.dom.minidom import Attr
 from flask import Flask, request, jsonify, render_template, redirect, session, url_for
 import boto3
 from botocore.exceptions import NoCredentialsError, PartialCredentialsError, ClientError
+from boto3.dynamodb.conditions import Attr
+
 
 app = Flask(__name__)
 app.secret_key = 'S3cUr3K3Yf0rY0ur4pP!'
@@ -15,21 +16,20 @@ def verificar_credenciales(access_key, secret_key):
 
 def obtener_rol_usuario(access_key, secret_key):
     iam = boto3.client('iam', aws_access_key_id=access_key, aws_secret_access_key=secret_key)
-    user_arn = iam.get_user()['User']['Arn']
-    user_name = user_arn.split('/')[-1]
+    user_name = boto3.client('sts', aws_access_key_id=access_key, aws_secret_access_key=secret_key).get_caller_identity()['Arn'].split('/')[-1]
     attached_policies = iam.list_attached_user_policies(UserName=user_name)
     roles = []
     for policy in attached_policies['AttachedPolicies']:
         if policy['PolicyName'] == 'AdminPolicies':  # Ajustar según el nombre exacto de tu política
             roles.append('admin')
+        elif policy['PolicyName'] == 'SoloLectura':  # Ajustar según el nombre exacto de tu política
+            roles.append('solo_lectura')
         else:
             roles.append('user')
     return roles
 
 def obtener_bucket_usuario(access_key, secret_key):
-    iam = boto3.client('iam', aws_access_key_id=access_key, aws_secret_access_key=secret_key)
-    user_arn = iam.get_user()['User']['Arn']
-    user_name = user_arn.split('/')[-1].lower()  # Convertir el nombre de usuario a minúsculas
+    user_name = boto3.client('sts', aws_access_key_id=access_key, aws_secret_access_key=secret_key).get_caller_identity()['Arn'].split('/')[-1].lower()  # Convertir el nombre de usuario a minúsculas
     return f'bucket-{user_name}'
 
 @app.route('/', methods=['GET', 'POST'])
@@ -107,7 +107,9 @@ def listar_documentos():
         s3 = boto3.client('s3', aws_access_key_id=session['access_key'], aws_secret_access_key=session['secret_key'])
         response = s3.list_objects_v2(Bucket=bucket)
         archivos = response.get('Contents', [])
-        return render_template('listar_documentos.html', archivos=archivos, title="Lista de Documentos")
+        
+        user_roles = session.get('user_roles', [])
+        return render_template('listar_documentos.html', archivos=archivos, user_roles=user_roles, title="Lista de Documentos")
 
     except NoCredentialsError:
         return jsonify({"error": "Credenciales no encontradas"}), 400
@@ -226,7 +228,6 @@ def documentos_destacados():
         return jsonify({"error": e.response['Error']['Message']}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
 
 if __name__ == '__main__':
     app.run(debug=True)

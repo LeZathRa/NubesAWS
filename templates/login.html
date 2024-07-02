@@ -9,13 +9,13 @@
 </head>
 <body>
     <div class="login-container">
-        <h1>Iniciar Sesión</h1>
+        <h1>Ingrese sus Credenciales de Usuario</h1>
         <form action="{{ url_for('login') }}" method="post">
             <label for="access_key">Access Key:</label>
             <input type="text" id="access_key" name="access_key" required><br>
             <label for="secret_key">Secret Key:</label>
             <input type="password" id="secret_key" name="secret_key" required><br>
-            <button type="submit">Iniciar Sesión</button>
+            <button type="submit">Log in</button>
         </form>
         {% if error %}
             <p style="color:red;">{{ error }}</p>

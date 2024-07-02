@@ -1,6 +1,7 @@
 {% extends "layout.html" %}
 
 {% block title %}Lista de Documentos{% endblock %}
+{% if 'admin' in user_roles %}
 
 {% block content %}
     <h1>Lista de Documentos</h1>
@@ -13,4 +14,5 @@
             </form>
         </div>
     {% endfor %}
+    {% endif %}
 {% endblock %}
