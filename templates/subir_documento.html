@@ -1,5 +1,7 @@
 {% extends "layout.html" %}
 
+{% block title %}Subir Documento{% endblock %}
+
 {% block content %}
     <h1>Subir Documento</h1>
     <form action="{{ url_for('subir_documento') }}" method="post" enctype="multipart/form-data">

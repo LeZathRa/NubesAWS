@@ -1,15 +1,25 @@
-{% extends "layout.html" %}
-
-{% block content %}
-    <h1>Iniciar Sesión</h1>
-    <form action="{{ url_for('login') }}" method="post">
-        <label for="access_key">Access Key:</label>
-        <input type="text" id="access_key" name="access_key" required><br>
-        <label for="secret_key">Secret Key:</label>
-        <input type="password" id="secret_key" name="secret_key" required><br>
-        <button type="submit">Iniciar Sesión</button>
-    </form>
-    {% if error %}
-        <p style="color:red;">{{ error }}</p>
-    {% endif %}
-{% endblock %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iniciar Sesión</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <div class="login-container">
+        <h1>Iniciar Sesión</h1>
+        <form action="{{ url_for('login') }}" method="post">
+            <label for="access_key">Access Key:</label>
+            <input type="text" id="access_key" name="access_key" required><br>
+            <label for="secret_key">Secret Key:</label>
+            <input type="password" id="secret_key" name="secret_key" required><br>
+            <button type="submit">Iniciar Sesión</button>
+        </form>
+        {% if error %}
+            <p style="color:red;">{{ error }}</p>
+        {% endif %}
+    </div>
+</body>
+</html>

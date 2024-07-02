@@ -1,3 +1,4 @@
+from xml.dom.minidom import Attr
 from flask import Flask, request, jsonify, render_template, redirect, session, url_for
 import boto3
 from botocore.exceptions import NoCredentialsError, PartialCredentialsError, ClientError
@@ -25,6 +26,12 @@ def obtener_rol_usuario(access_key, secret_key):
             roles.append('user')
     return roles
 
+def obtener_bucket_usuario(access_key, secret_key):
+    iam = boto3.client('iam', aws_access_key_id=access_key, aws_secret_access_key=secret_key)
+    user_arn = iam.get_user()['User']['Arn']
+    user_name = user_arn.split('/')[-1].lower()  # Convertir el nombre de usuario a minúsculas
+    return f'bucket-{user_name}'
+
 @app.route('/', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -34,10 +41,16 @@ def login():
             session['access_key'] = access_key
             session['secret_key'] = secret_key
             session['user_roles'] = obtener_rol_usuario(access_key, secret_key)
+            session['bucket'] = obtener_bucket_usuario(access_key, secret_key)
             return redirect(url_for('home'))
         else:
             return render_template('login.html', error="Credenciales incorrectas")
     return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
 
 @app.route('/home')
 def home():
@@ -56,7 +69,7 @@ def subir_documento():
     try:
         archivo = request.files['file']
         nombre = archivo.filename
-        bucket = 'bucket-empresarial'
+        bucket = session['bucket']
         s3 = boto3.client('s3', aws_access_key_id=session['access_key'], aws_secret_access_key=session['secret_key'])
         dynamodb = boto3.resource('dynamodb', region_name='us-east-1', aws_access_key_id=session['access_key'], aws_secret_access_key=session['secret_key'])
         table = dynamodb.Table('Documentos')
@@ -66,6 +79,7 @@ def subir_documento():
         table.put_item(
             Item={
                 'DocumentoID': nombre,
+                'Usuario': session['access_key'],
                 'Version': '1',
                 'Fecha': '2024-06-29'
             }
@@ -89,29 +103,11 @@ def listar_documentos():
     if 'access_key' not in session or 'secret_key' not in session:
         return redirect(url_for('login'))
     try:
+        bucket = session['bucket']
         s3 = boto3.client('s3', aws_access_key_id=session['access_key'], aws_secret_access_key=session['secret_key'])
-        response = s3.list_objects_v2(Bucket='bucket-empresarial')
+        response = s3.list_objects_v2(Bucket=bucket)
         archivos = response.get('Contents', [])
         return render_template('listar_documentos.html', archivos=archivos, title="Lista de Documentos")
-
-    except NoCredentialsError:
-        return jsonify({"error": "Credenciales no encontradas"}), 400
-    except PartialCredentialsError:
-        return jsonify({"error": "Credenciales incompletas"}), 400
-    except ClientError as e:
-        return jsonify({"error": e.response['Error']['Message']}), 500
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/documento/<string:documento_id>', methods=['GET'])
-def obtener_versiones_documento(documento_id):
-    if 'access_key' not in session or 'secret_key' not in session:
-        return redirect(url_for('login'))
-    try:
-        s3 = boto3.client('s3', aws_access_key_id=session['access_key'], aws_secret_access_key=session['secret_key'])
-        response = s3.list_object_versions(Bucket='bucket-empresarial', Prefix=documento_id)
-        versiones = response.get('Versions', [])
-        return jsonify(versiones), 200
 
     except NoCredentialsError:
         return jsonify({"error": "Credenciales no encontradas"}), 400
@@ -127,8 +123,9 @@ def obtener_documento_por_version(documento_id, version_id):
     if 'access_key' not in session or 'secret_key' not in session:
         return redirect(url_for('login'))
     try:
+        bucket = session['bucket']
         s3 = boto3.client('s3', aws_access_key_id=session['access_key'], aws_secret_access_key=session['secret_key'])
-        response = s3.get_object(Bucket='bucket-empresarial', Key=documento_id, VersionId=version_id)
+        response = s3.get_object(Bucket=bucket, Key=documento_id, VersionId=version_id)
         return response['Body'].read(), 200
 
     except NoCredentialsError:
@@ -145,8 +142,9 @@ def almacenamiento():
     if 'access_key' not in session or 'secret_key' not in session:
         return redirect(url_for('login'))
     try:
+        bucket = session['bucket']
         s3 = boto3.client('s3', aws_access_key_id=session['access_key'], aws_secret_access_key=session['secret_key'])
-        response = s3.list_objects_v2(Bucket='bucket-empresarial')
+        response = s3.list_objects_v2(Bucket=bucket)
         archivos = response.get('Contents', [])
         return render_template('almacenamiento.html', archivos=archivos, title="Almacenamiento")
 
@@ -161,15 +159,20 @@ def almacenamiento():
 
 @app.route('/destacados')
 def destacados():
+    return render_template('destacados.html', title="Destacados")
+
+@app.route('/descargar/<string:archivo_key>', methods=['GET'])
+def descargar_archivo(archivo_key):
     if 'access_key' not in session or 'secret_key' not in session:
         return redirect(url_for('login'))
     try:
-        dynamodb = boto3.resource('dynamodb', region_name='us-east-1', aws_access_key_id=session['access_key'], aws_secret_access_key=session['secret_key'])
-        table = dynamodb.Table('DocumentosDestacados')
-        response = table.scan()
-        documentos = response.get('Items', [])
-        return render_template('destacados.html', documentos=documentos, title="Documentos Destacados")
-
+        bucket = session['bucket']
+        s3 = boto3.client('s3', aws_access_key_id=session['access_key'], aws_secret_access_key=session['secret_key'])
+        archivo = s3.get_object(Bucket=bucket, Key=archivo_key)
+        return archivo['Body'].read(), 200, {
+            'Content-Type': archivo['ContentType'],
+            'Content-Disposition': f'attachment; filename={archivo_key}'
+        }
     except NoCredentialsError:
         return jsonify({"error": "Credenciales no encontradas"}), 400
     except PartialCredentialsError:
@@ -186,23 +189,44 @@ def destacar_documento():
     try:
         documento_id = request.form['documento_id']
         dynamodb = boto3.resource('dynamodb', region_name='us-east-1', aws_access_key_id=session['access_key'], aws_secret_access_key=session['secret_key'])
-        table = dynamodb.Table('DocumentosDestacados')
+        table = dynamodb.Table('FeaturedDocuments')
         
         table.put_item(
             Item={
-                'DocumentoID': documento_id
+                'DocumentoID': documento_id,
+                'Usuario': session['access_key'],
+                'Fecha': '2024-06-29'  # Puedes ajustar esto para que sea la fecha actual
             }
         )
-        return jsonify({"message": "Documento destacado con éxito"}), 201
 
-    except NoCredentialsError:
-        return jsonify({"error": "Credenciales no encontradas"}), 400
-    except PartialCredentialsError:
-        return jsonify({"error": "Credenciales incompletas"}), 400
+        return redirect(url_for('listar_documentos'))
+
     except ClientError as e:
         return jsonify({"error": e.response['Error']['Message']}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route('/documentos_destacados')
+def documentos_destacados():
+    if 'access_key' not in session or 'secret_key' not in session:
+        return redirect(url_for('login'))
+    try:
+        dynamodb = boto3.resource('dynamodb', region_name='us-east-1', aws_access_key_id=session['access_key'], aws_secret_access_key=session['secret_key'])
+        table = dynamodb.Table('FeaturedDocuments')
+        
+        # Filtrar documentos destacados por el usuario actual
+        response = table.scan(
+            FilterExpression=Attr('Usuario').eq(session['access_key'])
+        )
+        documentos_destacados = response.get('Items', [])
+
+        return render_template('documentos_destacados.html', documentos=documentos_destacados, title="Documentos Destacados")
+
+    except ClientError as e:
+        return jsonify({"error": e.response['Error']['Message']}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 if __name__ == '__main__':
     app.run(debug=True)

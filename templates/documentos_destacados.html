@@ -1,0 +1,10 @@
+{% extends "layout.html" %}
+
+{% block title %}Documentos Destacados{% endblock %}
+
+{% block content %}
+    <h1>Documentos Destacados</h1>
+    {% for documento in documentos %}
+        <p>{{ documento.DocumentoID }}</p>
+    {% endfor %}
+{% endblock %}

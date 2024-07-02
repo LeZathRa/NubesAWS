@@ -6,7 +6,7 @@ dynamodb = boto3.client('dynamodb', region_name='us-east-1')
 try:
     # Crear la tabla
     response = dynamodb.create_table(
-        TableName='Documentos',
+        TableName='FeaturedDocuments',
         KeySchema=[
             {
                 'AttributeName': 'DocumentoID',
