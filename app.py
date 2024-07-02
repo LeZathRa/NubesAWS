@@ -228,6 +228,33 @@ def documentos_destacados():
         return jsonify({"error": e.response['Error']['Message']}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+@app.route('/eliminar/<string:archivo_key>', methods=['POST'])
+def eliminar_archivo(archivo_key):
+    if 'access_key' not in session or 'secret_key' not in session:
+        return redirect(url_for('login'))
+    try:
+        bucket = session['bucket']
+        s3 = boto3.client('s3', aws_access_key_id=session['access_key'], aws_secret_access_key=session['secret_key'])
+        
+        # Eliminar el archivo del bucket S3
+        s3.delete_object(Bucket=bucket, Key=archivo_key)
+        
+        # Eliminar el registro de DynamoDB
+        dynamodb = boto3.resource('dynamodb', region_name='us-east-1', aws_access_key_id=session['access_key'], aws_secret_access_key=session['secret_key'])
+        table = dynamodb.Table('Documentos')
+        table.delete_item(Key={'DocumentoID': archivo_key})
+
+        return redirect(url_for('listar_documentos'))
+
+    except NoCredentialsError:
+        return jsonify({"error": "Credenciales no encontradas"}), 400
+    except PartialCredentialsError:
+        return jsonify({"error": "Credenciales incompletas"}), 400
+    except ClientError as e:
+        return jsonify({"error": e.response['Error']['Message']}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 if __name__ == '__main__':
     app.run(debug=True)
